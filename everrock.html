@@ -22,12 +22,11 @@ body {
 <li>...
 </ol>
 <br>
-<a href=https://github.com/gabrielsroka/gabrielsroka.github.io/blob/master/DSPRules.html>source</a>
+<a href=https://github.com/everrock/everrock.github.io/blob/main/everrock.html>source</a>
 <script id=code>
 (async function () {
     
-    /* TODO: activate when create?
-             DomainGPO
+    /* TODO: DomainGPO
     */
     
     const headers = {
@@ -37,9 +36,11 @@ body {
     const token = document.querySelector('input[name=__RequestVerificationToken]').value;
     const tabId = document.querySelector('#tabId').value;
 
-    const popup = createPopup('DSP Rules');
+    const popup = createPopup('DSP Notification Rules');
     const form = $('<form>' +
-        '<label>Import Rule CSV<br><input type=file class=importRules></label><br><br>' +
+        '<label>Import Nofication Rules from CSV<br><input type=file class=importRules></label><br><br>' +
+        '<input type=button class=activateRules value="Activate Rules"><br><br>' + 
+        '<input type=button class=deactivateRules value="Deactivate Rules"><br><br>' + 
         '<input type=button class=exportRules value="Export Rules"><br><br>' +
         '<input type=button class=deleteRules value="Delete Rules">' + 
         '</form>').appendTo(popup);
@@ -50,23 +51,40 @@ body {
             const rules = parseFile(reader.result);
             for (const rule of rules) {
                 rule.Recipients = rule.Recipients.split(',');
+                rule.IsAlertRecipients = rule.ObjectsToggle = rule.CriteriaToggle = true;
                 await createRule(rule);
-                await activateRule(rule);
             }
             alert('Done.');
         };
         if (this.files.length > 0) reader.readAsText(this.files[0]);
     });
 
+    form.find('input.activateRules').click(async () => {
+        const rules = await getRules();
+        for (const rule of rules) {
+            rule.Filter = JSON.stringify(rule.Filter);
+            await activateRule(rule);
+        }
+        alert('Done.');
+    });
+
+    form.find('input.deactivateRules').click(async () => {
+        const rules = await getRules();
+        for (const rule of rules) {
+            rule.Filter = JSON.stringify(rule.Filter);
+            await deactivateRule(rule);
+        }
+        alert('Done.');
+    });
+
     form.find('input.exportRules').click(async () => {
         const rules = await getRules();
         const csv = [];
+        const header = 'Name,Severity,Recipients,Filter,IsAutoUndo,ObjectSearch,IsOU,IsSecurityEvent,DistinguishedName,IsEnabled';
         for (const rule of rules) {
-            csv.push(toCSV(rule.Name, rule.Severity, rule.Recipients, JSON.stringify(rule.Filter), rule.IsAlertRecipients, rule.ObjectsToggle, 
-                rule.CriteriaToggle, rule.IsAutoUndo, rule.ObjectSearch, rule.IsOU, rule.IsSecurityEvent, rule.DistinguishedName));
+            rule.Filter = JSON.stringify(rule.Filter);
+            csv.push(toCSV(header.split(',').map(h => rule[h])));
         }
-        const header = 'Name,Severity,Recipients,Filter,IsAlertRecipients,ObjectsToggle,' +
-            'CriteriaToggle,IsAutoUndo,ObjectSearch,IsOU,IsSecurityEvent,DistinguishedName';
         downloadCSV(popup, header, csv, 'rules');
     });
 
@@ -82,18 +100,23 @@ body {
     /* Util functions */
     async function createRule(rule) {
         rule.RuleID = 'temp';
-        rule.__RequestVerificationToken = token;
-        rule.tabId = tabId;
         const RuleID = await saveRule(rule);
         rule.RuleID = RuleID;
     }
 
     async function activateRule(rule) {
         rule.IsEnabled = true;
-        const result = await saveRule(rule);
+        await saveRule(rule);
+    }
+
+    async function deactivateRule(rule) {
+        rule.IsEnabled = false;
+        await saveRule(rule);
     }
 
     async function saveRule(rule) {
+        rule.__RequestVerificationToken = token;
+        rule.tabId = tabId;
         const body = new URLSearchParams(rule);
         rule.Recipients.forEach(r => body.append('Recipients[]', r));
         body.delete('Recipients');
@@ -130,7 +153,7 @@ body {
     function createPopup(title) {
         const popup = $(`<div style='position: absolute; z-index: 1000; top: 0px; max-height: calc(100% - 28px); max-width: calc(100% - 28px); padding: 8px; margin: 4px; ` +
                 `overflow: auto; background-color: white; border: 1px solid #ddd;'>` +
-            `${title}<div style='display: block; float: right;'><a href='https://gabrielsroka.github.io/DSPRules.html' target='_blank' rel='noopener' style='padding: 4px'>?</a> ` + 
+            `${title}<div style='display: block; float: right;'><a href='https://everrock.github.io/everrock.html' target='_blank' rel='noopener' style='padding: 4px'>?</a> ` + 
             `<a onclick='document.body.removeChild(this.parentNode.parentNode)' style='cursor: pointer; padding: 4px'>X</a></div><br><br></div>`).appendTo(document.body);
         return $('<div></div>').appendTo(popup);
     }
@@ -162,7 +185,7 @@ body {
             return Object.fromEntries(headers.map((k, i) => [k, values[i]]));
         });
     }
-    function toCSV(...fields) {
+    function toCSV(fields) {
         return fields.map(field => `"${field == undefined ? '' : field.toString().replace(/"/g, '""')}"`).join(',');
     }
     function downloadCSV(popup, header, lines, filename) {
