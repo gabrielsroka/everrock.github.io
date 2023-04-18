@@ -1,9 +1,9 @@
 # Everrock Basics
 ##
-### everrock.html (Start Here)
+### everrock.html (Start Here: https://everrock.github.io/everrock.html)
 #### Still a WIP, but has the bookmarklet and other details
 ##
-### baseNotificationRules.csv
+### baseNotificationRules.csv (https://everrock.github.io/baseNotificationRules.csv)
 #### Use as a template for the base recommended Notification Rules
 #### Only edits needed are as follows:
 #### 1. Change Domain DNs/FQDNs to match your environment
