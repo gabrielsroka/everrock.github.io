@@ -1,8 +1,8 @@
-(async function () {
-    
-    /* TODO: DomainGPO
+(async function() {
+
+    /* v 1.7 Added Sections for Notification Rules and Import of Privileged Groups
     */
-    
+
     const headers = {
         'Accept': 'application/json; charset=utf-8',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
@@ -10,18 +10,21 @@
     const token = document.querySelector('input[name=__RequestVerificationToken]').value;
     const tabId = document.querySelector('#tabId').value;
 
-    const popup = createPopup('DSP Notification Rules');
-    const form = $('<form>' +
-        '<label>Import Nofication Rules from CSV<br><input type=file class=importRules></label><br><br>' +
-        '<input type=button class=activateRules value="Activate Rules"><br><br>' + 
-        '<input type=button class=deactivateRules value="Deactivate Rules"><br><br>' + 
-        '<input type=button class=exportRules value="Export Rules"><br><br>' +
-        '<input type=button class=deleteRules value="Delete Rules">' + 
-        '</form>').appendTo(popup);
+    const popup = createPopup('<b>Everrock Toolbox</b>');
+    const form = $('<form>' + 
+                   '<b>Notification Rules</b><br><br>' + 
+                   '<label>Import Nofication Rules from CSV<br><br><input type=file class=importRules></label><br><br>' + 
+                   '<input type=button class=activateRules value="Activate Rules"><br><br>' + 
+                   '<input type=button class=deactivateRules value="Deactivate Rules"><br><br>' + 
+                   '<input type=button class=exportRules value="Export Rules"><br><br>' + 
+                   '<input type=button class=deleteRules value="Delete Rules"><br><br>' + 
+                   '<br><br><b>Privileged Groups</b><br><br>' +
+                   '<label>Import Privileged Groups from Text<br><br><input type=file class=importPrivGroups></label><br><br>' + 
+                   '</form>').appendTo(popup);
 
-    form.find('input.importRules').change(function () {
+    form.find('input.importRules').change(function() {
         const reader = new FileReader();
-        reader.onload = async () => {
+        reader.onload = async()=>{
             const rules = parseFile(reader.result);
             for (const rule of rules) {
                 rule.Recipients = rule.Recipients.split(',');
@@ -29,11 +32,13 @@
                 await createRule(rule);
             }
             alert('Done.');
-        };
-        if (this.files.length > 0) reader.readAsText(this.files[0]);
+        }
+        ;
+        if (this.files.length > 0)
+            reader.readAsText(this.files[0]);
     });
 
-    form.find('input.activateRules').click(async () => {
+    form.find('input.activateRules').click(async()=>{
         const rules = await getRules();
         for (const rule of rules) {
             rule.IsAlertRecipients = rule.ObjectsToggle = rule.CriteriaToggle = true;
@@ -41,9 +46,10 @@
             await activateRule(rule);
         }
         alert('Done.');
-    });
+    }
+    );
 
-    form.find('input.deactivateRules').click(async () => {
+    form.find('input.deactivateRules').click(async()=>{
         const rules = await getRules();
         for (const rule of rules) {
             rule.IsAlertRecipients = rule.ObjectsToggle = rule.CriteriaToggle = true;
@@ -51,28 +57,44 @@
             await deactivateRule(rule);
         }
         alert('Done.');
-    });
+    }
+    );
 
-    form.find('input.exportRules').click(async () => {
+    form.find('input.exportRules').click(async()=>{
         const rules = await getRules();
         const csv = [];
         const header = 'Name,Severity,Recipients,Filter,IsAutoUndo,ObjectSearch,IsOU,IsSecurityEvent,DistinguishedName,IsEnabled';
         for (const rule of rules) {
             rule.Filter = JSON.stringify(rule.Filter);
-            csv.push(toCSV(header.split(',').map(h => rule[h])));
+            csv.push(toCSV(header.split(',').map(h=>rule[h])));
         }
         downloadCSV(popup, header, csv, 'rules');
-    });
+    }
+    );
 
-    form.find('input.deleteRules').click(async () => {
-        if (!confirm('Are you sure you want delete all rules?')) return;
+    form.find('input.deleteRules').click(async()=>{
+        if (!confirm('Are you sure you want delete all rules?'))
+            return;
         const rules = await getRules();
         for (const rule of rules) {
             await deleteRule(rule);
         }
         alert('Done.');
+    }
+    );
+    
+    form.find('input.importPrivGroups').change(function () {
+        const reader = new FileReader();
+        reader.onload = async () => {
+            const groups = parseFile(reader.result);
+            for (const group of groups) {
+                await createGroup(group);
+            }
+            alert('Done.');
+        };
+        if (this.files.length > 0) reader.readAsText(this.files[0]);
     });
-        
+
     /* Util functions */
     async function createRule(rule) {
         rule.RuleID = 'temp';
@@ -93,7 +115,7 @@
         rule.__RequestVerificationToken = token;
         rule.tabId = tabId;
         const body = new URLSearchParams(rule);
-        rule.Recipients.forEach(r => body.append('Recipients[]', r));
+        rule.Recipients.forEach(r=>body.append('Recipients[]', r));
         body.delete('Recipients');
 
         const res = await fetch('/DSP/Notifications/SaveRule', {
@@ -105,7 +127,7 @@
         await getRules();
         return RuleID;
     }
-    
+
     async function getRules() {
         const res = await fetch(`/DSP/Notifications/GetRules?tabId=${tabId}`, {
             headers,
@@ -124,50 +146,97 @@
         await getRules();
     }
 
+    async function createGroup(group){
+        const version = await getVersion();
+        const body = new URLSearchParams({
+            __RequestVerificationToken: token,
+            name: group.name,
+            version,
+            tabId
+        });
+    
+        const res = await fetch(`/DSP/Reports/PrivilegedGroup`, {
+            "headers": {
+                "Accept": "application/json; charset=utf-8",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            },
+            body,
+            "method": "POST"
+        });
+    
+        const privGroup = await res.json();
+        console.log('add PrivilegedGroup', privGroup);
+    }
+
+
+    async function getVersion() {
+
+        const tabId = document.querySelector('#tabId').value;
+
+        const res = await fetch(`/DSP/General/GetAdsmSettings?_tabId=${tabId}`, {
+            "headers": {
+                "accept": "application/json; charset=utf-8",
+            },
+            "method": "GET"
+        });
+
+        const adsmSettings = await res.json();
+        const version = adsmSettings.Version;
+        console.log(version);
+        return version;
+    }
+
     function createPopup(title) {
-        const popup = $(`<div style='position: absolute; z-index: 1000; top: 0px; max-height: calc(100% - 28px); max-width: calc(100% - 28px); padding: 8px; margin: 4px; ` +
-                `overflow: auto; background-color: white; border: 1px solid #ddd;'>` +
-            `${title}<div style='display: block; float: right;'><a href='https://everrock.github.io/everrock.html' target='_blank' rel='noopener' style='padding: 4px'>?</a> ` + 
-            `<a onclick='document.body.removeChild(this.parentNode.parentNode)' style='cursor: pointer; padding: 4px'>X</a></div><br><br></div>`).appendTo(document.body);
+        const popup = $(`<div style='position: absolute; z-index: 1000; top: 0px; right: 0px; max-height: calc(100% - 28px); max-width: calc(100% - 28px); padding: 8px; margin: 4px; ` +
+                    `overflow: auto; background-color: white; border: 1px solid #ddd;'>` +
+                    `${title}<div style='display: block; float: right;'><a href='https://everrock.github.io/everrock.html' target='_blank' rel='noopener' style='padding: 4px'>?</a> ` +
+                    `<a onclick='document.body.removeChild(this.parentNode.parentNode)' style='cursor: pointer; padding: 4px'>X</a></div><br><br></div>`).appendTo(document.body);
         return $('<div></div>').appendTo(popup);
     }
-    
+
     function parseFile(file) {
         const lineSeparator = /\r\n|\r|\n/;
         const fieldSeparator = ',';
         const enc = '"';
 
         const lines = file.split(lineSeparator);
-        if (lines[lines.length - 1] == '') lines.pop();
+        if (lines[lines.length - 1] == '')
+            lines.pop();
         const headers = lines.shift().split(fieldSeparator);
 
-        return lines.map(line => {
+        return lines.map(line=>{
             const o = {};
-            for (var p = 0, i = 0; p < line.length; p = q + r + 1, i++) {
+            for (var p = 0, i = 0; p < line.length; p = q + r + 1,
+            i++) {
                 if (line[p] == enc) {
                     p++;
                     var r = 1;
                     var q = line.indexOf(enc, p);
-                    while (line[q + 1] == enc) q = line.indexOf(enc, q + 2);
+                    while (line[q + 1] == enc)
+                        q = line.indexOf(enc, q + 2);
                 } else {
                     r = 0;
                     q = line.indexOf(fieldSeparator, p);
-                    if (q == -1) q = line.length;
+                    if (q == -1)
+                        q = line.length;
                 }
                 o[headers[i]] = line.slice(p, q).replace(/""/g, '"');
             }
             return o;
-        });
+        }
+        );
     }
     function toCSV(fields) {
-        return fields.map(field => `"${field == undefined ? '' : field.toString().replace(/"/g, '""')}"`).join(',');
+        return fields.map(field=>`"${field == undefined ? '' : field.toString().replace(/"/g, '""')}"`).join(',');
     }
     function downloadCSV(popup, header, lines, filename) {
         var a = $('<a>').appendTo(popup);
-        a.attr('href', URL.createObjectURL(new Blob([header + '\n' + lines.join('\n')], {type: 'text/csv'})));
+        a.attr('href', URL.createObjectURL(new Blob([header + '\n' + lines.join('\n')],{
+            type: 'text/csv'
+        })));
         var date = (new Date()).toISOString().replace(/T/, ' ').replace(/:/g, '-').slice(0, 19);
         a.attr('download', `${filename} ${date}.csv`);
         a[0].click();
     }
-})
-();
+}
+)();
