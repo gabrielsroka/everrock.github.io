@@ -1,4 +1,3 @@
-javascript:
 (async function () {
     
     /* TODO: DomainGPO
