@@ -1,0 +1,6 @@
+name
+BLUE\DSP-Admin-L1
+BLUE\DSP-Admin-L2
+BLUE\DSP-Product-Mgr
+BLUE\DSP-Reader
+BLUE\DSP-Report-Mgr
